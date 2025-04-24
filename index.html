@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Интерактивная карта Европы и Азии межвоенного периода (1918–1939).">
+    <meta name="keywords" content="карта, Европа, Азия, история, межвоенный период, Первая мировая война">
+    <meta name="author" content="Твоё имя">
+    <title>Интерактивная карта</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts для шрифта Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #1c2526 0%, #2c3436 100%);
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100vh;
+            border-radius: 0;
+            box-shadow: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+        #map.loaded {
+            opacity: 1;
+        }
+        .container {
+            max-width: 100%;
+            padding: 10px;
+        }
+        h1 {
+            font-size: 1.5rem; /* Уменьшен размер заголовка */
+            color: #e0e0e0;
+            background: rgba(44, 52, 54, 0.9);
+            padding: 10px 20px; /* Уменьшен padding */
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+            position: absolute;
+            top: 20px;
+            left: 20px; /* Перемещён в левый верхний угол */
+            z-index: 1000;
+            animation: fadeIn 1s ease-in;
+        }
+        .toggle-button {
+            background: rgba(44, 52, 54, 0.9);
+            color: #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.1s ease;
+            position: absolute;
+            top: 20px;
+            right: 20px; /* Перемещён в правый верхний угол */
+            z-index: 1000;
+            animation: fadeIn 1.2s ease-in;
+        }
+        .toggle-button:hover {
+            background: rgba(60, 70, 72, 0.9);
+            transform: scale(1.05);
+        }
+        .language-buttons {
+            position: absolute;
+            top: 70px; /* Расположен ниже заголовка */
+            left: 20px; /* Левый верхний угол */
+            z-index: 1000;
+            display: flex;
+            gap: 8px; /* Уменьшенный зазор */
+            animation: fadeIn 1.4s ease-in;
+        }
+        .language-button {
+            background: rgba(44, 52, 54, 0.9);
+            color: #e0e0e0;
+            padding: 6px 12px; /* Уменьшен padding */
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.1s ease;
+            font-size: 0.9rem; /* Уменьшен размер шрифта */
+        }
+        .language-button:hover {
+            background: rgba(60, 70, 72, 0.9);
+            transform: scale(1.05);
+        }
+        .language-button.active {
+            background: #ff3b30;
+        }
+        .search-container {
+            position: absolute;
+            top: 110px; /* Расположен ниже кнопок языка */
+            left: 20px; /* Левый верхний угол */
+            z-index: 1000;
+            display: flex;
+            gap: 8px; /* Уменьшенный зазор */
+            animation: fadeIn 1.6s ease-in;
+        }
+        .search-input {
+            background: rgba(44, 52, 54, 0.9);
+            color: #e0e0e0;
+            padding: 6px 12px; /* Уменьшен padding */
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: none;
+            width: 150px; /* Уменьшенная ширина */
+            font-size: 0.9rem; /* Уменьшен размер шрифта */
+        }
+        .search-input::placeholder {
+            color: #b0b0b0;
+        }
+        .search-button {
+            background: rgba(44, 52, 54, 0.9);
+            color: #e0e0e0;
+            padding: 6px 12px; /* Уменьшен padding */
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.1s ease;
+            font-size: 0.9rem; /* Уменьшен размер шрифта */
+        }
+        .search-button:hover {
+            background: rgba(60, 70, 72, 0.9);
+            transform: scale(1.05);
+        }
+        .country-label {
+            color: #b0b0b0;
+            font-weight: 700;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+            animation: fadeIn 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .postwar-label {
+            color: #ff3b30;
+            font-weight: 700;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            animation: fadeIn 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .postwar-border {
+            color: #ff3b30;
+            weight: 2;
+            opacity: 0.5;
+            dashArray: '5, 5';
+        }
+        .country-border {
+            color: #b0b0b0;
+            weight: 0.5;
+            opacity: 0.4;
+            dashArray: '2, 2';
+        }
+        /* Стили для контроллеров зума */
+        .leaflet-control-zoom {
+            border: none !important;
+        }
+        .leaflet-control-zoom a {
+            background-color: #2c3436 !important; /* Тёмный фон */
+            color: #e0e0e0 !important; /* Светлый текст */
+            border-radius: 50% !important; /* Округлые кнопки */
+            width: 30px !important;
+            height: 30px !important;
+            line-height: 30px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+            margin-bottom: 8px !important;
+        }
+        .leaflet-control-zoom a:hover {
+            background-color: #3c4648 !important; /* Чуть светлее при наведении */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="map-title">Интерактивная карта</h1>
+        <button id="toggle-borders" class="toggle-button">Скрыть послевоенные границы</button>
+        <div class="language-buttons">
+            <button class="language-button active" data-lang="pl">Polski</button>
+            <button class="language-button" data-lang="uk">Українська</button>
+        </div>
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Wpisz kraj...">
+            <button id="search-button" class="search-button">Szukaj</button>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        const map = L.map('map').setView([50, 15], 3.5);
+
+        // Добавление тёмной карты (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://carto.com/attributions">CARTO</a>',
+            opacity: 0.3
+        }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://carto.com/attributions">CARTO</a>',
+            opacity: 0.3,
+            pane: 'markerPane'
+        }).addTo(map);
+
+        map.whenReady(() => {
+            document.getElementById('map').classList.add('loaded');
+        });
+
+        // Переключение языков
+        let currentLang = 'pl'; // По умолчанию польский
+
+        const languageButtons = document.querySelectorAll('.language-button');
+        languageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                languageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                currentLang = button.dataset.lang;
+                updateLanguage();
+                updateMarkers();
+            });
+        });
+
+        // Заголовки на двух языках
+        const titles = {
+            pl: "Interaktywna mapa",
+            uk: "Інтерактивна карта"
+        };
+
+        // Текст кнопок и placeholder
+        const buttonTexts = {
+            toggleBorders: {
+                pl: { show: "Pokaż granice powojenne", hide: "Ukryj granice powojenne" },
+                uk: { show: "Показати післявоєнні кордони", hide: "Приховати післявоєнні кордони" }
+            },
+            searchButton: {
+                pl: "Szukaj",
+                uk: "Пошук"
+            },
+            searchPlaceholder: {
+                pl: "Wpisz kraj...",
+                uk: "Введіть країну..."
+            }
+        };
+
+        // Список современных стран (Азия) с названиями на двух языках
+        const modernCountries = [
+            { name: { pl: "Chiny", uk: "Китай" }, lat: 39.9042, lng: 116.4074 },
+            { name: { pl: "Japonia", uk: "Японія" }, lat: 35.6762, lng: 139.6503 },
+            { name: "Indie", lat: 28.6139, lng: 77.2090 }
+        ];
+
+        // Исторические страны (межвоенный период) с описаниями на двух языках
+        const historicalCountries = [
+            { name: { pl: "Portugalia", uk: "Португалія" }, lat: 38.7223, lng: -9.1393, description: { pl: "Neutralna podczas I wojny światowej, zachowała granice.", uk: "Нейтральна під час I світової війни, зберегла кордони." } },
+            { name: { pl: "Hiszpania", uk: "Іспанія" }, lat: 40.4168, lng: -3.7038, description: { pl: "Neutralna w I wojnie światowej, bez zmian terytorialnych.", uk: "Нейтральна в I світовій війні, без змін територій." } },
+            { name: { pl: "Wielka Brytania", uk: "Велика Британія" }, lat: 51.5074, lng: -0.1278, description: { pl: "Jedna z głównych potęg zwycięskich w I wojnie światowej.", uk: "Одна з головних переможних держав у I світовій війні." } },
+            { name: { pl: "Szwajcaria", uk: "Швейцарія" }, lat: 46.9479, lng: 7.4474, description: { pl: "Neutralna w I wojnie światowej, bez zmian terytorialnych.", uk: "Нейтральна в I світовій війні, без змін територій." } },
+            { name: { pl: "Włochy", uk: "Італія" }, lat: 41.9028, lng: 12.4964, description: { pl: "Otrzymały Tyrol Południowy i Istrię na mocy traktatu wersalskiego.", uk: "Отримали Південний Тіроль та Істрію за Версальським договором." } },
+            { name: { pl: "Austria", uk: "Австрія" }, lat: 48.2082, lng: 16.3738, description: { pl: "Utworzona jako republika po rozpadzie Austro-Węgier w 1918 roku.", uk: "Утворена як республіка після розпаду Австро-Угорщини в 1918 році." } },
+            { name: { pl: "Czechosłowacja", uk: "Чехословаччина" }, lat: 50.0755, lng: 14.4378, description: { pl: "Utworzona po I wojnie światowej z części Austro-Węgier.", uk: "Утворена після I світової війни з частини Австро-Угорщини." } },
+            { name: { pl: "Węgry", uk: "Угорщина" }, lat: 47.4979, lng: 19.0402, description: { pl: "Utraciły 2/3 terytorium na mocy traktatu z Trianon w 1920 roku.", uk: "Втратили 2/3 території за Тріанонським договором у 2020 році." } },
+            { name: { pl: "Rumunia", uk: "Румунія" }, lat: 44.4268, lng: 26.1025, description: { pl: "Zyskała Besarabię i Transylwanię po I wojnie światowej.", uk: "Отримала Бессарабію та Трансільванію після I світової війни." } },
+            { name: { pl: "Bułgaria", uk: "Болгарія" }, lat: 42.6977, lng: 23.3219, description: { pl: "Utraciła terytoria na rzecz Grecji i Jugosławii po I wojnie światowej.", uk: "Втратила території на користь Греції та Югославії після I світової війни." } },
+            { name: { pl: "Jugosławia", uk: "Югославія" }, lat: 44.7866, lng: 20.4489, description: { pl: "Utworzona w 1918 roku jako Królestwo Serbów, Chorwatów i Słoweńców.", uk: "Утворена в 1918 році як Королівство сербів, хорватів і словенців." } },
+            { name: { pl: "Albania", uk: "Албанія" }, lat: 41.3275, lng: 19.8187, description: { pl: "Niepodległa od 1912 roku, bez większych zmian po I wojnie światowej.", uk: "Незалежна з 1912 року, без значних змін після I світової війни." } },
+            { name: { pl: "Grecja", uk: "Греція" }, lat: 37.9838, lng: 23.7275, description: { pl: "Zyskała terytoria kosztem Turcji i Bułgarii po I wojnie światowej.", uk: "Отримала території за рахунок Туреччини та Болгарії після I світової війни." } },
+            { name: { pl: "Turcja", uk: "Туреччина" }, lat: 39.9334, lng: 32.8597, description: { pl: "Utworzona jako republika w 1923 roku po upadku Imperium Osmańskiego.", uk: "Утворена як республіка в 1923 році після падіння Османської імперії." } },
+            { name: { pl: "Polska", uk: "Польща" }, lat: 52.2297, lng: 21.0122, description: { pl: "Odzyskała niepodległość w 1918 roku po 123 latach zaborów.", uk: "Відновила незалежність у 1918 році після 123 років поділів." } },
+            { name: { pl: "Litwa", uk: "Литва" }, lat: 54.6872, lng: 25.2797, description: { pl: "Odzyskała niepodległość w 1918 roku, spór o Wilno z Polską.", uk: "Відновила незалежність у 1918 році, спір за Вільнюс із Польщею." } },
+            { name: { pl: "Łotwa", uk: "Латвія" }, lat: 56.9496, lng: 24.1052, description: { pl: "Odzyskała niepodległość w 1918 roku po I wojnie światowej.", uk: "Відновила незалежність у 1918 році після I світової війни." } },
+            { name: { pl: "Estonia", uk: "Естонія" }, lat: 59.4370, lng: 24.7536, description: { pl: "Odzyskała niepodległość w 1918 roku po I wojnie światowej.", uk: "Відновила незалежність у 1918 році після I світової війни." } },
+            { name: { pl: "Finlandia", uk: "Фінляндія" }, lat: 60.1699, lng: 24.9384, description: { pl: "Odzyskała niepodległość w 1917 roku, potwierdzona po I wojnie światowej.", uk: "Відновила незалежність у 1917 році, підтверджено після I світової війни." } },
+            { name: { pl: "Szwecja", uk: "Швеція" }, lat: 59.3293, lng: 18.0686, description: { pl: "Neutralna w I wojnie światowej, bez zmian terytorialnych.", uk: "Нейтральна в I світовій війні, без змін територій." } },
+            { name: { pl: "Norwegia", uk: "Норвегія" }, lat: 59.9139, lng: 10.7522, description: { pl: "Neutralna w I wojnie światowej, bez zmian terytorialnych.", uk: "Нейтральна в I світовій війні, без змін територій." } },
+            { name: { pl: "Dania", uk: "Данія" }, lat: 55.6761, lng: 12.5683, description: { pl: "Neutralna w I wojnie światowej, odzyskała Szlezwik Północny w 1920 roku.", uk: "Нейтральна в I світовій війні, відновила Північний Шлезвіг у 1920 році." } }
+        ];
+
+        // Послевоенные пункты с привязкой к современным странам
+        const postwarPoints = [
+            { name: { pl: "Zagłębie Saary", uk: "Саарський басейн" }, lat: 49.2333, lng: 6.9969, description: { pl: "Region sporny po I wojnie światowej, zarządzany przez Ligę Narodów do 1935 roku.", uk: "Спірний регіон після I світової війни, керований Лігою Націй до 1935 року." }, modernCountry: { pl: "Niemcy", uk: "Німеччина" } },
+            { name: { pl: "Zagłębie Ruhry", uk: "Рурський басейн" }, lat: 51.4556, lng: 7.0116, description: { pl: "Okupowane przez Francję i Belgię w 1923 roku w ramach reparacji po I wojnie światowej.", uk: "Окуповано Францією та Бельгією в 1923 році в рамках репарацій після I світової війни." }, modernCountry: { pl: "Niemcy", uk: "Німеччина" } },
+            { name: { pl: "Tyrol", uk: "Тіроль" }, lat: 47.2692, lng: 11.4041, description: { pl: "Południowy Tyrol przekazany Włochom po I wojnie światowej na mocy traktatu wersalskiego.", uk: "Південний Тіроль переданий Італії після I світової війни за Версальським договором." }, modernCountry: { pl: "Włochy", uk: "Італія" } },
+            { name: { pl: "Irlandia Północna", uk: "Північна Ірландія" }, lat: 54.5973, lng: -5.9301, description: { pl: "Utworzona w 1921 roku po podziale Irlandii, pozostała częścią Wielkiej Brytanii.", uk: "Утворена в 1921 році після поділу Ірландії, залишилася частиною Великої Британії." }, modernCountry: { pl: "Wielka Brytania", uk: "Велика Британія" } },
+            { name: { pl: "Gibraltar", uk: "Гібралтар" }, lat: 36.1447, lng: -5.3526, description: { pl: "Strategiczny punkt brytyjski, pozostał pod kontrolą Wielkiej Brytanii.", uk: "Стратегічний британський пункт, залишився під контролем Великої Британії." }, modernCountry: { pl: "Wielka Brytania", uk: "Велика Британія" } },
+            { name: { pl: "Normandia", uk: "Нормандія" }, lat: 49.1829, lng: -0.3707, description: { pl: "Region Francji, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон Франції, без змін територій після I світової війни." }, modernCountry: { pl: "Francja", uk: "Франція" } },
+            { name: { pl: "Szkocja", uk: "Шотландія" }, lat: 55.9533, lng: -3.1883, description: { pl: "Część Wielkiej Brytanii, bez zmian terytorialnych.", uk: "Частина Великої Британії, без змін територій." }, modernCountry: { pl: "Wielka Brytania", uk: "Велика Британія" } },
+            { name: { pl: "Sycylia", uk: "Сицилія" }, lat: 37.6000, lng: 14.0154, description: { pl: "Wyspa włoska, bez zmian terytorialnych.", uk: "Італійський острів, без змін територій." }, modernCountry: { pl: "Włochy", uk: "Італія" } },
+            { name: { pl: "Korsyka", uk: "Корсика" }, lat: 42.0396, lng: 9.0129, description: { pl: "Wyspa francuska, bez zmian terytorialnych.", uk: "Французький острів, без змін територій." }, modernCountry: { pl: "Francja", uk: "Франція" } },
+            { name: { pl: "Sardynia", uk: "Сардинія" }, lat: 39.2238, lng: 9.1217, description: { pl: "Wyspa włoska, bez zmian terytorialnych.", uk: "Італійський острів, без змін територій." }, modernCountry: { pl: "Włochy", uk: "Італія" } },
+            { name: { pl: "Kreta", uk: "Крит" }, lat: 35.2401, lng: 24.8093, description: { pl: "Wyspa grecka, bez zmian terytorialnych po I wojnie światowej.", uk: "Грецький острів, без змін територій після I світової війни." }, modernCountry: { pl: "Grecja", uk: "Греція" } },
+            { name: { pl: "Cypr", uk: "Кіпр" }, lat: 35.1856, lng: 33.3823, description: { pl: "Pod kontrolą brytyjską od 1878 roku, formalnie anektowany w 1914 roku.", uk: "Під контролем Британії з 1878 року, формально анексований у 1914 році." }, modernCountry: { pl: "Cypr", uk: "Кіпр" } },
+            { name: { pl: "Tracja", uk: "Фракія" }, lat: 41.1553, lng: 25.3685, description: { pl: "Zachodnia część przekazana Grecji po I wojnie światowej, wschodnia pozostała w Turcji.", uk: "Західна частина передана Греції після I світової війни, східна залишилася в Туреччині." }, modernCountry: { pl: "Grecja", uk: "Греція" } },
+            { name: { pl: "Wołyń", uk: "Волинь" }, lat: 50.7472, lng: 25.3254, description: { pl: "Historyczny region wschodniej Polski, przekazany Polsce po I wojnie światowej.", uk: "Історичний регіон східної Польщі, переданий Польщі після I світової війни." }, modernCountry: { pl: "Ukraina", uk: "Україна" } },
+            { name: { pl: "Galicja", uk: "Галичина" }, lat: 49.8383, lng: 24.0232, description: { pl: "Historyczny region wschodniej Polski, przekazany Polsce po I wojnie światowej.", uk: "Історичний регіон східної Польщі, переданий Польщі після I світової війни." }, modernCountry: { pl: "Ukraina", uk: "Україна" } },
+            { name: { pl: "Istria", uk: "Істрія" }, lat: 45.4647, lng: 13.5219, description: { pl: "Przekazana Włochom po I wojnie światowej, później sporna między Włochami a Jugosławią.", uk: "Передана Італії після I світової війни, пізніше спірна між Італією та Югославією." }, modernCountry: { pl: "Chorwacja", uk: "Хорватія" } },
+            { name: { pl: "Dalmacja", uk: "Далмація" }, lat: 43.5081, lng: 16.4402, description: { pl: "Region wzdłuż wybrzeża Adriatyku, część Jugosławii po I wojnie światowej.", uk: "Регіон уздовж узбережжя Адріатики, частина Югославії після I світової війни." }, modernCountry: { pl: "Chorwacja", uk: "Хорватія" } },
+            { name: { pl: "Banat", uk: "Банат" }, lat: 45.7467, lng: 20.6388, description: { pl: "Region podzielony między Rumunię i Jugosławię po I wojnie światowej.", uk: "Регіон поділений між Румунією та Югославією після I світової війни." }, modernCountry: { pl: "Serbia", uk: "Сербія" } },
+            { name: { pl: "Macedonia", uk: "Македонія" }, lat: 41.9965, lng: 21.4319, description: { pl: "Podzielona między Jugosławię, Grecję i Bułgarię po I wojnie światowej.", uk: "Поділена між Югославією, Грецією та Болгарією після I світової війни." }, modernCountry: { pl: "Macedonia Północna", uk: "Північна Македонія" } },
+            { name: { pl: "Epir", uk: "Епір" }, lat: 39.6650, lng: 20.8514, description: { pl: "Region podzielony między Grecję i Albanię po I wojnie światowej.", uk: "Регіон поділений між Грецією та Албанією після I світової війни." }, modernCountry: { pl: "Grecja", uk: "Греція" } },
+            { name: { pl: "Transylwania", uk: "Трансільванія" }, lat: 46.7712, lng: 23.6236, description: { pl: "Przekazana Rumunii po I wojnie światowej na mocy traktatu z Trianon.", uk: "Передана Румунії після I світової війни за Тріанонським договором." }, modernCountry: { pl: "Rumunia", uk: "Румунія" } },
+            { name: { pl: "Besarabia", uk: "Бессарабія" }, lat: 47.0167, lng: 28.8497, description: { pl: "Przekazana Rumunii po I wojnie światowej, wcześniej część Imperium Rosyjskiego.", uk: "Передана Румунії після I світової війни, раніше частина Російської імперії." }, modernCountry: { pl: "Mołdawia", uk: "Молдова" } },
+            { name: { pl: "Śląsk", uk: "Сілезія" }, lat: 50.2649, lng: 19.0238, description: { pl: "Region podzielony między Polskę i Niemcy po plebiscycie w 1921 roku.", uk: "Регіон поділений між Польщею та Німеччиною після плебісциту в 1921 році." }, modernCountry: { pl: "Polska", uk: "Польща" } },
+            { name: { pl: "Górny Śląsk", uk: "Верхня Сілезія" }, lat: 50.2945, lng: 18.6714, description: { pl: "Część Śląska, gdzie odbył się plebiscyt w 1921 roku, podzielona między Polskę i Niemcy.", uk: "Частина Сілезії, де відбувся плебісцит у 1921 році, поділена між Польщею та Німеччиною." }, modernCountry: { pl: "Polska", uk: "Польща" } },
+            { name: { pl: "Rus Zakarpacka", uk: "Закарпатська Русь" }, lat: 48.6208, lng: 22.2879, description: { pl: "Region przekazany Czechosłowacji po I wojnie światowej, obecnie część Ukrainy.", uk: "Регіон переданий Чехословаччині після I світової війни, нині частина України." }, modernCountry: { pl: "Ukraina", uk: "Україна" } },
+            { name: { pl: "Słowacja", uk: "Словаччина" }, lat: 48.1486, lng: 17.1077, description: { pl: "Część Czechosłowacji po I wojnie światowej, wcześniej w granicach Austro-Węgier.", uk: "Частина Чехословаччини після I світової війни, раніше в межах Австро-Угорщини." }, modernCountry: { pl: "Słowacja", uk: "Словаччина" } },
+            { name: { pl: "Karyntia", uk: "Каринтія" }, lat: 46.7222, lng: 14.1803, description: { pl: "Region podzielony między Austrię i Jugosławię po plebiscycie w 1920 roku.", uk: "Регіон поділений між Австрією та Югославією після плебісциту в 1920 році." }, modernCountry: { pl: "Austria", uk: "Австрія" } },
+            { name: { pl: "Bośnia", uk: "Боснія" }, lat: 43.8563, lng: 18.4131, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej pod kontrolą Austro-Węgier.", uk: "Частина Югославії після I світової війни, раніше під контролем Австро-Угорщини." }, modernCountry: { pl: "Bośnia i Hercegowina", uk: "Боснія і Герцеговина" } },
+            { name: { pl: "Hercegowina", uk: "Герцеговина" }, lat: 43.3438, lng: 17.8078, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej pod kontrolą Austro-Węgier.", uk: "Частина Югославії після I світової війни, раніше під контролем Австро-Угорщини." }, modernCountry: { pl: "Bośnia i Hercegowina", uk: "Боснія і Герцеговина" } },
+            { name: { pl: "Czarnogóra", uk: "Чорногорія" }, lat: 42.4304, lng: 19.2594, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej niepodległe królestwo.", uk: "Частина Югославії після I світової війни, раніше незалежне королівство." }, modernCountry: { pl: "Czarnogóra", uk: "Чорногорія" } },
+            { name: { pl: "Serbia", uk: "Сербія" }, lat: 44.7866, lng: 20.4489, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej niepodległe królestwo.", uk: "Частина Югославії після I світової війни, раніше незалежне королівство." }, modernCountry: { pl: "Serbia", uk: "Сербія" } },
+            { name: { pl: "Chorwacja", uk: "Хорватія" }, lat: 45.8150, lng: 15.9819, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej pod kontrolą Austro-Węgier.", uk: "Частина Югославії після I світової війни, раніше під контролем Австро-Угорщини." }, modernCountry: { pl: "Chorwacja", uk: "Хорватія" } },
+            { name: { pl: "Słowenia", uk: "Словенія" }, lat: 46.0569, lng: 14.5058, description: { pl: "Część Jugosławii po I wojnie światowej, wcześniej pod kontrolą Austro-Węgier.", uk: "Частина Югославії після I світової війни, раніше під контролем Австро-Угорщини." }, modernCountry: { pl: "Słowenia", uk: "Словенія" } },
+            { name: { pl: "Bukowina", uk: "Буковина" }, lat: 47.8400, lng: 25.9000, description: { pl: "Region podzielony między Rumunię i Czechosłowację po I wojnie światowej.", uk: "Регіон поділений між Румунією та Чехословаччиною після I світової війни." }, modernCountry: { pl: "Ukraina", uk: "Україна" } },
+            { name: { pl: "Katalonia", uk: "Каталонія" }, lat: 41.3851, lng: 2.1734, description: { pl: "Region w Hiszpanii, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон в Іспанії, без змін територій після I світової війни." }, modernCountry: { pl: "Hiszpania", uk: "Іспанія" } },
+            { name: { pl: "Walencja", uk: "Валенсія" }, lat: 39.4699, lng: -0.3763, description: { pl: "Region w Hiszpanii, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон в Іспанії, без змін територій після I світової війни." }, modernCountry: { pl: "Hiszpania", uk: "Іспанія" } },
+            { name: { pl: "Andaluzja", uk: "Андалусия" }, lat: 37.3886, lng: -5.9829, description: { pl: "Region w Hiszpanii, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон в Іспанії, без змін територій після I світової війни." }, modernCountry: { pl: "Hiszpania", uk: "Іспанія" } },
+            { name: { pl: "Toskania", uk: "Тоскана" }, lat: 43.7711, lng: 11.2486, description: { pl: "Region w Italii, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон в Італії, без змін територій після I світової війни." }, modernCountry: { pl: "Włochy", uk: "Італія" } },
+            { name: { pl: "Peloponez", uk: "Пелопоннес" }, lat: 37.5079, lng: 22.3735, description: { pl: "Region w Grecji, bez zmian terytorialnych po I wojnie światowej.", uk: "Регіон в Греції, без змін територій після I світової війни." }, modernCountry: { pl: "Grecja", uk: "Греція" } }
+        ];
+
+        // Границы исторических стран
+        const countryBorders = [
+            { name: { pl: "Portugalia", uk: "Португалія" }, coords: [[39.3999, -8.2245], [38.7223, -9.1393], [37.0176, -7.9750], [39.3999, -8.2245]] },
+            { name: { pl: "Hiszpania", uk: "Іспанія" }, coords: [[40.4637, -3.7492], [41.3851, 2.1734], [37.3886, -5.9829], [40.4637, -3.7492]] },
+            { name: { pl: "Wielka Brytania", uk: "Велика Британія" }, coords: [[55.3781, -3.4360], [51.5074, -0.1278], [50.3755, -4.1427], [55.3781, -3.4360]] },
+            { name: { pl: "Szwajcaria", uk: "Швейцарія" }, coords: [[46.8182, 8.2275], [46.9479, 7.4474], [47.3769, 8.5417], [46.8182, 8.2275]] },
+            { name: { pl: "Włochy", uk: "Італія" }, coords: [[41.9028, 12.4964], [45.4642, 9.1900], [40.8518, 14.2681], [41.9028, 12.4964]] },
+            { name: { pl: "Austria", uk: "Австрія" }, coords: [[47.5162, 14.5501], [48.2082, 16.3738], [47.2692, 11.4041], [47.5162, 14.5501]] },
+            { name: { pl: "Czechosłowacja", uk: "Чехословаччина" }, coords: [[50.0755, 14.4378], [48.6900, 16.9700], [48.6208, 22.2879], [50.0755, 14.4378]] },
+            { name: { pl: "Węgry", uk: "Угорщина" }, coords: [[47.4979, 19.0402], [46.0731, 18.2323], [48.1500, 20.6333], [47.4979, 19.0402]] },
+            { name: { pl: "Rumunia", uk: "Румунія" }, coords: [[47.0167, 28.8497], [44.4268, 26.1025], [46.7712, 23.6236], [47.0167, 28.8497]] },
+            { name: { pl: "Bułgaria", uk: "Болгарія" }, coords: [[42.6977, 23.3219], [43.2123, 27.9150], [41.2354, 25.2607], [42.6977, 23.3219]] },
+            { name: { pl: "Jugosławia", uk: "Югославія" }, coords: [[46.5546, 15.6499], [45.4647, 13.5219], [42.4304, 19.2594], [46.5546, 15.6499]] },
+            { name: { pl: "Albania", uk: "Албанія" }, coords: [[41.3275, 19.8187], [40.0700, 20.1500], [42.6656, 19.9500], [41.3275, 19.8187]] },
+            { name: { pl: "Grecja", uk: "Греція" }, coords: [[37.9838, 23.7275], [40.6401, 22.9444], [35.2401, 24.8093], [37.9838, 23.7275]] },
+            { name: { pl: "Turcja", uk: "Туреччина" }, coords: [[39.9334, 32.8597], [41.0082, 28.9784], [37.0662, 37.3781], [39.9334, 32.8597]] },
+            { name: { pl: "Polska", uk: "Польща" }, coords: [[54.3520, 19.3749], [53.4289, 14.5530], [50.8700, 14.8011], [54.3520, 19.3749]] },
+            { name: { pl: "Litwa", uk: "Литва" }, coords: [[56.4500, 21.0500], [54.6872, 25.2797], [53.9000, 23.3163], [56.4500, 21.0500]] },
+            { name: { pl: "Łotwa", uk: "Латвія" }, coords: [[56.9496, 24.1052], [57.5385, 25.4244], [55.6747, 26.5900], [56.9496, 24.1052]] },
+            { name: { pl: "Estonia", uk: "Естонія" }, coords: [[59.4370, 24.7536], [58.5953, 25.0136], [59.5567, 26.7385], [59.4370, 24.7536]] },
+            { name: { pl: "Finlandia", uk: "Фінляндія" }, coords: [[64.9631, 26.0145], [60.1699, 24.9384], [62.8980, 27.6377], [64.9631, 26.0145]] },
+            { name: { pl: "Szwecja", uk: "Швеція" }, coords: [[63.4468, 20.3154], [59.3293, 18.0686], [55.6761, 13.1932], [63.4468, 20.3154]] },
+            { name: { pl: "Norwegia", uk: "Норвегія" }, coords: [[60.4720, 8.4689], [59.9139, 10.7522], [62.1479, 6.1549], [60.4720, 8.4689]] },
+            { name: { pl: "Dania", uk: "Данія" }, coords: [[55.6761, 12.5683], [56.2639, 9.5018], [54.7877, 11.5000], [55.6761, 12.5683]] }
+        ];
+
+        // Отрисовка границ стран
+        const countryBorderLayers = [];
+        countryBorders.forEach(border => {
+            const layer = L.polyline(border.coords, {
+                color: '#b0b0b0',
+                weight: 0.5,
+                opacity: 0.4,
+                dashArray: '2, 2',
+                className: 'country-border'
+            }).addTo(map);
+            countryBorderLayers.push(layer);
+        });
+
+        // Послевоенные границы
+        const postwarBorders = [
+            { name: { pl: "Polska", uk: "Польща" }, coords: [[54.3520, 19.3749], [53.4289, 14.5530], [50.8700, 14.8011], [49.0020, 22.8869], [52.2297, 23.2000], [54.3520, 19.3749]] },
+            { name: { pl: "Czechosłowacja", uk: "Чехословаччина" }, coords: [[50.8700, 14.8011], [48.6900, 16.9700], [48.6208, 22.2879], [50.0755, 19.0000], [50.8700, 14.8011]] },
+            { name: { pl: "Jugosławia", uk: "Югославія" }, coords: [[46.5546, 15.6499], [45.4647, 13.5219], [42.4304, 19.2594], [41.9965, 21.4319], [44.7866, 20.4489], [46.5546, 15.6499]] },
+            { name: { pl: "Rumunia", uk: "Румунія" }, coords: [[47.0167, 28.8497], [44.4268, 26.1025], [46.7712, 23.6236], [45.7467, 20.6388], [47.0167, 28.8497]] },
+            { name: { pl: "Litwa", uk: "Литва" }, coords: [[56.4500, 21.0500], [54.6872, 25.2797], [53.9000, 23.3163], [56.4500, 21.0500]] }
+        ];
+
+        let bordersVisible = true;
+        const postwarBorderLayers = [];
+        postwarBorders.forEach(border => {
+            const layer = L.polyline(border.coords, {
+                color: '#ff3b30',
+                weight: 2,
+                opacity: 0.5,
+                dashArray: '5, 5',
+                className: 'postwar-border'
+            }).addTo(map);
+            postwarBorderLayers.push(layer);
+        });
+
+        // Переключение видимости границ
+        const toggleBordersButton = document.getElementById('toggle-borders');
+        toggleBordersButton.addEventListener('click', () => {
+            bordersVisible = !bordersVisible;
+            postwarBorderLayers.forEach(layer => {
+                if (bordersVisible) {
+                    layer.addTo(map);
+                } else {
+                    map.removeLayer(layer);
+                }
+            });
+            toggleBordersButton.textContent = bordersVisible ? buttonTexts.toggleBorders[currentLang].hide : buttonTexts.toggleBorders[currentLang].show;
+        });
+
+        // Функция для плавного изменения размера шрифта
+        function getFontSize(zoom, type) {
+            const baseSize = type === 'country' ? 12 : 16;
+            const minSize = type === 'country' ? 8 : 14;
+            const zoomFactor = (zoom - 3) * 0.5;
+            if (zoom > 5) return baseSize + 3;
+            if (zoom < 3) return minSize;
+            return Math.max(minSize, baseSize + zoomFactor);
+        }
+
+        // Функция для проверки перекрытия маркеров (только для стран)
+        const markers = [];
+        function checkOverlap(lat, lng, zoom) {
+            const bounds = map.getBounds();
+            if (!bounds.contains([lat, lng])) return true;
+            const pixelPos = map.latLngToLayerPoint([lat, lng]);
+            for (let i = 0; i < markers.length; i++) {
+                const otherPos = map.latLngToLayerPoint([markers[i].lat, markers[i].lng]);
+                const distance = Math.sqrt(
+                    Math.pow(pixelPos.x - otherPos.x, 2) + Math.pow(pixelPos.y - otherPos.y, 2)
+                );
+                if (distance < 60 / (zoom / 5)) return true;
+            }
+            markers.push({ lat, lng });
+            return false;
+        }
+
+        // Обновление маркеров
+        let countryMarkers = [];
+        let postwarMarkers = [];
+        let currentFilter = ''; // Текущий фильтр по стране
+        function updateMarkers() {
+            // Закрываем все открытые всплывающие окна
+            map.closePopup();
+
+            // Удаляем старые маркеры
+            countryMarkers.forEach(marker => map.removeLayer(marker));
+            postwarMarkers.forEach(marker => map.removeLayer(marker));
+            countryMarkers = [];
+            postwarMarkers = [];
+            markers.length = 0;
+
+            const zoom = map.getZoom();
+            const bounds = map.getBounds();
+
+            // Добавление маркеров для современных стран (Азия)
+            modernCountries.forEach(country => {
+                if (bounds.contains([country.lat, country.lng]) && !checkOverlap(country.lat, country.lng, zoom)) {
+                    const marker = L.marker([country.lat, country.lng], {
+                        icon: L.divIcon({
+                            className: 'country-label',
+                            html: `<div style="font-size: ${getFontSize(zoom, 'country')}px">${country.name[currentLang]}</div>`,
+                            iconSize: [100, 20],
+                            iconAnchor: [50, 10]
+                        })
+                    }).addTo(map);
+                    countryMarkers.push(marker);
+                }
+            });
+
+            // Добавление маркеров для исторических стран
+            historicalCountries.forEach(country => {
+                if (bounds.contains([country.lat, country.lng]) && !checkOverlap(country.lat, country.lng, zoom)) {
+                    const marker = L.marker([country.lat, country.lng], {
+                        icon: L.divIcon({
+                            className: 'country-label',
+                            html: `<div style="font-size: ${getFontSize(zoom, 'country')}px">${country.name[currentLang]}</div>`,
+                            iconSize: [100, 20],
+                            iconAnchor: [50, 10]
+                        })
+                    }).bindPopup(`<b>${country.name[currentLang]}</b><br>${country.description[currentLang]}`).addTo(map);
+                    countryMarkers.push(marker);
+                }
+            });
+
+            // Добавление маркеров для послевоенных пунктов с фильтрацией
+            postwarPoints.forEach(point => {
+                if (bounds.contains([point.lat, point.lng])) {
+                    if (!currentFilter || point.modernCountry[currentLang].toLowerCase().includes(currentFilter.toLowerCase())) {
+                        const marker = L.marker([point.lat, point.lng], {
+                            icon: L.divIcon({
+                                className: 'postwar-label',
+                                html: `<div style="font-size: ${getFontSize(zoom, 'postwar')}px">${point.name[currentLang]}</div>`,
+                                iconSize: [120, 20],
+                                iconAnchor: [60, 10]
+                            })
+                        }).bindPopup(`<b>${point.name[currentLang]}</b><br>${point.description[currentLang]}<br><i>${point.modernCountry[currentLang]}</i>`).addTo(map);
+                        postwarMarkers.push(marker);
+                    }
+                }
+            });
+        }
+
+        // Функция для обновления языка
+        function updateLanguage() {
+            document.getElementById('map-title').textContent = titles[currentLang];
+            toggleBordersButton.textContent = bordersVisible ? buttonTexts.toggleBorders[currentLang].hide : buttonTexts.toggleBorders[currentLang].show;
+            document.getElementById('search-button').textContent = buttonTexts.searchButton[currentLang];
+            document.getElementById('search-input').placeholder = buttonTexts.searchPlaceholder[currentLang];
+        }
+
+        // Поиск и фильтрация
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        searchButton.addEventListener('click', () => {
+            currentFilter = searchInput.value.trim();
+            updateMarkers();
+        });
+
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                currentFilter = searchInput.value.trim();
+                updateMarkers();
+            }
+        });
+
+        // Обновление маркеров только при масштабировании
+        let ticking = false;
+        function requestUpdateMarkers() {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    updateMarkers();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }
+
+        // Первичная загрузка маркеров
+        updateMarkers();
+
+        // Обновление только при масштабировании
+        map.on('zoomend', requestUpdateMarkers);
+
+        // При перемещении карты маркеры не пересоздаются
+        map.on('moveend', () => {
+            // Ничего не делаем с маркерами, они остаются
+        });
+    </script>
+</body>
+</html>
